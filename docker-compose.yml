@@ -18,6 +18,8 @@ services:
     pull_policy: build
     container_name: bibrunner-ocr-api
     restart: always
+    expose:
+      - "8000"
     ports:
       - "8001:8000"
     environment:
@@ -52,6 +54,8 @@ services:
     pull_policy: build
     container_name: bibrunner-web
     restart: always
+    expose:
+      - "3000"
     ports:
       - "3000:3000"
     environment:
