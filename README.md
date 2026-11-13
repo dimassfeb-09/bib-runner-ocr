@@ -31,7 +31,7 @@ docker exec -it bibrunner-web bun run db:seed
 ## Services
 
 - Web (Next.js): http://localhost:3000
-- OCR API (FastAPI): http://localhost:8000/health
+- OCR API (FastAPI): http://localhost:8001/health (host port; container tetap 8000)
 - Database: external PostgreSQL (set `DATABASE_URL` in `.env`)
 
 ## Notes
