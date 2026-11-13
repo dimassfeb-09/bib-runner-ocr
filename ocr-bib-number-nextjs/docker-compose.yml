@@ -1,0 +1,73 @@
+services:
+  # Database Service (PostgreSQL)
+  db:
+    image: postgres:15-alpine
+    container_name: bibrunner-db
+    restart: always
+    environment:
+      POSTGRES_DB: bibrunner
+      POSTGRES_USER: runner_user
+      POSTGRES_PASSWORD: runner_password
+    ports:
+      - "5431:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - runner-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U runner_user -d bibrunner" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Next.js Web Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bibrunner-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # Connect to the Postgres container by service name 'db'
+      DATABASE_URL: postgres://runner_user:runner_password@db:5432/bibrunner
+      # Connect to the Python OCR service container by name 'ocr-api'
+      OCR_API_URL: http://ocr-api:8000
+      NODE_ENV: production
+      # Read other keys from your .env / host system
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_PUBLIC_BUCKET: ${SUPABASE_PUBLIC_BUCKET}
+      SUPABASE_PRIVATE_BUCKET: ${SUPABASE_PRIVATE_BUCKET}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY}
+      NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: ${NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      GMAIL_USER: ${GMAIL_USER}
+      GMAIL_PASS: ${GMAIL_PASS}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - runner-network
+
+  # Python OCR API Service (Deployment block for your python backend)
+  ocr-api:
+    image: python:3.10-slim
+    container_name: bibrunner-ocr-api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    # Replace this command with your actual entrypoint script for python OCR server
+    command: python -c "import http.server; http.server.test(HandlerClass=http.server.SimpleHTTPRequestHandler, port=8000)"
+    networks:
+      - runner-network
+
+volumes:
+  pgdata:
+
+networks:
+  runner-network:
+    driver: bridge

@@ -1,0 +1,86 @@
+services:
+  db-migrate:
+    image: bib-runner-ocr-web:latest
+    pull_policy: never
+    container_name: bibrunner-db-migrate
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    command: bun run db:migrate
+    networks:
+      - runner-network
+    restart: "no"
+
+  ocr-api:
+    build:
+      context: ./ocr-bib-number-backend
+      dockerfile: Dockerfile
+    image: bib-runner-ocr-ocr-api:latest
+    pull_policy: build
+    container_name: bibrunner-ocr-api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - MIDTRANS_SERVER_KEY=${MIDTRANS_SERVER_KEY}
+      - MIDTRANS_CLIENT_KEY=${NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+      - MIDTRANS_IS_PRODUCTION=False
+      - APP_BASE_URL=http://ocr-api:8000
+      - BACKEND_URL=http://ocr-api:8000
+      - FRONTEND_BASE_URL=http://web:3000
+      - FRONTEND_URL=http://localhost:3000
+      - WATERMARK_TEXT=OCRBIBRunner
+      - YOLO_MODEL_PATH=weights/split9010_yolo26s/best.pt
+    volumes:
+      - paddleocr-cache:/root/.paddleocr
+    networks:
+      - runner-network
+
+  web:
+    build:
+      context: ./ocr-bib-number-nextjs
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: ${NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+        NEXT_PUBLIC_MIDTRANS_SNAP_URL: ${NEXT_PUBLIC_MIDTRANS_SNAP_URL}
+    image: bib-runner-ocr-web:latest
+    pull_policy: build
+    container_name: bibrunner-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      OCR_API_URL: http://ocr-api:8000
+      NODE_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_PUBLIC_BUCKET: ${SUPABASE_PUBLIC_BUCKET}
+      SUPABASE_PRIVATE_BUCKET: ${SUPABASE_PRIVATE_BUCKET}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY}
+      NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: ${NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      GMAIL_USER: ${GMAIL_USER}
+      GMAIL_PASS: ${GMAIL_PASS}
+    depends_on:
+      ocr-api:
+        condition: service_started
+      db-migrate:
+        condition: service_completed_successfully
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    networks:
+      - runner-network
+
+volumes:
+  paddleocr-cache:
+
+networks:
+  runner-network:
+    driver: bridge
